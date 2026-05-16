@@ -151,3 +151,20 @@ HR = μ × CH
 
 *Harmony Labs — Sovereign Technology Consortium*  
 *No unauthorized reproduction. All artifacts sealed by system authority.*
+---
+
+## Existing Files (preserved)
+
+- `web/index.html` — Original static reference implementation (94 lines)
+- `index.html` — Previous implementation (319 lines)  
+- `uatos_impl.py` — Python reference implementation with SCB dataclass (111 lines)
+- `uatos_reference_impl.py` — Simpler Python reference (38 lines)
+
+## v2 Architecture (2026-05-16)
+
+Added modular React frontend under `frontend/` that matches the live zo.space deployment:
+- `frontend/index.html` + `frontend/js/app.js` — Full React SPA (matches live /uatos route)
+- `frontend/js/core/` — 5 modular JS files: scb-manager, pipeline-engine, coherence-calc, audit-log, team-pulse
+- `backend/scb_store.py` — Flask REST API with JSON persistence (208 lines)
+- `tests/test_uatos.py` — Unit tests for coherence formulas
+
