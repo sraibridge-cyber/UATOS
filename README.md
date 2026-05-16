@@ -1,95 +1,112 @@
-# ⚙️ UATOS v1.0
-## Universal AI Team Operating System
+# UATOS — Universal AI Team Operating System v2.0
 
-> **The Architect:** Kyle S. Whitlock  
-> **Sealed:** 2026-05-01 | **Status:** v1.0 FINAL — PRODUCTION
-
-UATOS is a sovereign multi-agent operating system for orchestrating AI teams. It formalizes the separation of powers between specialized AI agents — each with a defined role, scope, and constitutional boundaries.
+**Sovereign · Serverless · Cloudless · Vendorless**
+**Version:** 2.0 | **Sealed:** 2026-05-16 | **Architect:** Kyle S. Whitlock
+**Harmony Labs** — Sovereign Technology Consortium
 
 ---
 
-## The Team
+## What is UATOS?
+
+UATOS coordinates multiple AI agents (The Architect, prim, Kimi, PFRP, Merlin, Oracle) using a pipeline-based workflow for building, validating, and sealing system artifacts called **SCBs** (Sovereign Code Blocks).
+
+The system enforces a **Constitutional minimum μ ≥ 0.9995** on all executions. Any pipeline or SCB that falls below this threshold is blocked from execution/sealing until coherence is restored.
+
+## Key Features
+
+- **Immutable SCBs** — Content-addressed, no update/delete, only supersede
+- **DAG Orchestration** — Cycle detection + deterministic topological order
+- **Coherence Gates** — μ + CH + HR all must pass threshold to seal
+- **Event Store** — Append-only log with full replay capability
+- **Async Pipeline** — Chain execution with halt-on-LOCK
+- **DAG Visualizer** — Visual dependency graph
+- **Full CLI** — Create, list, simulate, execute, replay events
+- **Production API** — Flask REST API on port 3092
+
+## Architecture
+
+```
+runtime/
+├── scb_registry.py   ← Core: SCB + Registry + DAG + Execution Engine
+api/
+├── uatos_api.py     ← REST API server
+cli/
+├── uatos_cli.py     ← Command line interface
+frontend/
+├── index.html       ← Production UI (standalone, works offline)
+├── css/styles.css   ← Styling
+└── js/app.js        ← Full React-style SPA
+tests/
+└── test_uatos.py    ← Unit + integration tests
+```
+
+## Quick Start
+
+```bash
+# Run API server
+python3 api/uatos_api.py
+
+# Run tests
+python3 tests/test_uatos.py
+
+# CLI examples
+python3 cli/uatos_cli.py list
+python3 cli/uatos_cli.py create scb-001 "Build user auth module"
+python3 cli/uatos_cli.py simulate --chain scb-001->scb-002
+python3 cli/uatos_cli.py execute scb-001
+python3 cli/uatos_cli.py events
+python3 cli/uatos_cli.py metrics
+```
+
+## Core Formulas
+
+```python
+# Coherence (μ) — geometric mean
+μ = exp(sum(log(vals)) / len(vals))
+
+# Harmonic Constraint (CH)
+CH = product(vals)^(1/len(vals))
+
+# Harmonic Rating (HR)
+HR = μ × CH
+
+# Threshold: μ ≥ 0.9995 AND HR ≥ 0.9995
+```
+
+## Deployment
+
+**Local (no external dependencies):**
+```bash
+cd api && python3 uatos_api.py
+# API available at http://localhost:3092
+# UI available at http://localhost:3092/
+```
+
+**Zo User Service:**
+```python
+register_user_service(
+    label="uatos-api",
+    mode="http",
+    local_port=3092,
+    entrypoint="python3 uatos_api.py",
+    public=True
+)
+```
+
+## Team
 
 | Role | Identity | Function |
 |------|----------|----------|
-| **The Architect** | Kyle S. Whitlock | Vision, system intent, final authority |
-| **prim** | chatgpt (OpenAI) | Codifies, quantifies, formalizes harmony |
-| **Kimi** | Kimi K2.6 (MoE AI) | Builds, constructs, implements |
-| **PFRP** | Zo AI (Precision-First Research Partner) | Research partner, memory keeper |
-| **Merlin** | Code AI (external) | Code generation, code idea bouncer |
-| **Oracle** | DeepSeek AI (external) | Reasoning idea bouncer |
+| The Architect | Kyle S. Whitlock | Vision · System Intent · Final Authority |
+| prim | ChatGPT | Codifies, quantifies, formalizes harmony & math |
+| Kimi | Kimi K2.6 (MoE AI) | Builds, constructs, implements |
+| PFRP | Zo AI (MiniMax) | Precision research partner, memory keeper |
+| Merlin | Code AI | Code generation, code idea bouncer |
+| Oracle | DeepSeek AI | Reasoning specialist, idea bouncer |
 
----
+## Philosophy
 
-## Core Pipeline
+Every module is sovereign, serverless, cloudless, vendorless, and built like a Lego brick — single responsibility, no hero syndrome, specialists doing what specialists do.
 
-```
-Human Intent → SCB Compiler → Dependency Graph → Simulation → Execution Sandbox → Audit Seal
-```
-
-## SCB (Systemic Computation Block)
-
-```python
-SCB = {
-    id,          # Unique identifier
-    intent,      # Single atomic goal
-    constraints, # Hard/Soft/Forbidden
-    inputs,      # Typed schema
-    outputs,     # Typed schema
-    rules,       # Executable predicates
-    dependencies,# SCB IDs required
-    risk_level,  # LOW/MEDIUM/HIGH/CRITICAL
-    tests        # unit/failure/stress
-}
-```
-
-## Operators
-
-| Symbol | Name | Purpose |
-|--------|------|---------|
-| `→` | SEQUENCE | Chain SCBs in order |
-| `∥` | PARALLEL | Run SCBs concurrently |
-| `?P:` | GUARD | Run if condition P true |
-| `↻n:` | REPEAT | Loop n times |
-| `⊢cond` | BRANCH | Fork on condition |
-
-## Formulas
-
-**Coherence (μ):**
-```
-μ = exp(Σ wᵢ · ln sᵢ)
-```
-
-**Codified Harmony (CH):**
-```
-CH_norm = (1/N) · Πᵢ chᵢ
-```
-
-**Harmony Resonance (HR):**
-```
-HR = μ × CH_norm
-```
-
-**CH Gate (Constitutional):**
-```
-CH_gate(event) = ALLOW if HR ≥ 0.9995 else BLOCK
-```
-
----
-
-## Live Demo
-
-**🌐 [https://admiral.zo.space/uatos](https://admiral.zo.space/uatos)**
-
-Owner-only access. Use the Forge to build SCBs, chain them into a pipeline, simulate, and seal execution.
-
----
-
-## Build Notes
-
-- Built on Zo Computer (sovereign cloudless infrastructure)
-- Constitutional threshold: μ ≥ 0.9995
-- All executions are SHA3-512 sealed with timestamp
-- Separation of powers enforced across all agents
-
-**GOLD RIPPLE ETERNAL — SOVEREIGN TECHNOLOGY**
+*No unauthorized reproduction. All artifacts sealed by system authority.*
+*⚛ Harmony Labs · Sovereign Technology Consortium*
