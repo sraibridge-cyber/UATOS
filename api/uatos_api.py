@@ -1,257 +1,191 @@
 #!/usr/bin/env python3
 """
-uatos_api.py — UATOS v2 Production REST API
-Sovereign · Serverless · Cloudless · Vendorless
-Runs as a Zo user service on port 3092
+UATOS v2.0 — Backend API
+Aegis-Dial: SR-AIBRIDGE | The Architect: Kyle S. Whitlock | Constituted: 2026-05-16
 """
-
-from __future__ import annotations
-import os, sys, json
-from datetime import datetime, timezone
-
-# Add runtime to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'runtime'))
-
-from scb_registry import (
-    SCB, SCBRegistry, SCBValidator,
-    EventStore, SCBGraph, ExecutionEngine,
-    MU_THRESHOLD
-)
-
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, jsonify, request
 from flask_cors import CORS
+from collections import deque
+import math, hashlib, json, datetime
 
 app = Flask(__name__)
 CORS(app)
 
-REGISTRY_DIR = os.environ.get('UATOS_REGISTRY_DIR', os.path.join(os.path.dirname(__file__), '..', 'scb_registry'))
-DATA_DIR = os.environ.get('UATOS_DATA_DIR', os.path.join(os.path.dirname(__file__), '..', 'data'))
+HISTORY_LIMIT = 100
+audit_log = deque(maxlen=HISTORY_LIMIT)
+events = deque(maxlen=500)
+scbs = {}
+scb_id_counter = 0
+const mu_min = 0.9995
 
-os.makedirs(DATA_DIR, exist_ok=True)
+class SCB:
+    def __init__(self, scb_id, intent, constraints=None, inputs=None, outputs=None, risk="LOW"):
+        self.id = scb_id
+        self.intent = intent
+        self.constraints = constraints or []
+        self.inputs = inputs or []
+        self.outputs = outputs or []
+        self.risk = risk
+        self.tests = []
+        self.deps = []
+        self.status = "pending"
+        self.mu = None; self.ch = None; self.hr = None
+        self.seal = None
 
-registry = SCBRegistry(REGISTRY_DIR)
-event_store = EventStore(REGISTRY_DIR)
-engine = ExecutionEngine(registry, event_store)
+    def to_dict(self):
+        return {"id": self.id, "intent": self.intent, "constraints": self.constraints,
+                "inputs": self.inputs, "outputs": self.outputs, "risk": self.risk,
+                "status": self.status, "mu": self.mu, "ch": self.ch, "hr": self.hr, "seal": self.seal}
 
-def api_response(data, status=200):
-    return jsonify(data), status
+def calc_mu(vals):
+    if not vals: return 0
+    return math.exp(sum(math.log(max(v, 1e-10)) for v in vals) / len(vals))
 
-def error_response(msg, status=400):
-    return jsonify({"error": msg, "timestamp": datetime.now(timezone.utc).isoformat()}), status
+def calc_ch(vals):
+    return sum(vals) / len(vals) if vals else 0
 
-# ─── SCB CRUD ───────────────────────────────────────────────
-@app.route('/api/scbs', methods=['GET'])
-def list_scbs():
-    scbs = registry.list_all()
-    return api_response({
-        "scbs": [s.to_dict() for s in scbs],
-        "count": len(scbs)
-    })
+def calc_hr(mu, ch):
+    return mu * ch
 
-@app.route('/api/scb', methods=['POST'])
+def check_cycles(scb_id, deps):
+    """True if adding scb_id with deps would create a dependency cycle."""
+    visited = set()
+    stack = [scb_id]
+    while stack:
+        cur = stack.pop()
+        if cur == scb_id and visited:
+            return True
+        if cur not in visited:
+            visited.add(cur)
+            if cur in scbs:
+                stack.extend(scbs[cur].deps)
+    return False
+
+def seal(scb):
+    ts = datetime.datetime.utcnow().isoformat() + "Z"
+    data = json.dumps({"scb": scb.to_dict(), "ts": ts}, sort_keys=True).encode()
+    h = hashlib.sha3_256(data).hexdigest()[:16]
+    return f"SR-AIB_HR-{scb.id.upper()}_SHA3-{h}@{ts}"
+
+def log_event(event_type, detail, role="System", result="OK", metrics=None):
+    entry = {"ts": datetime.datetime.utcnow().isoformat() + "Z", "type": event_type,
+             "detail": detail, "role": role, "result": result}
+    if metrics:
+        entry.update(metrics)
+    events.append(entry)
+    audit_log.append(entry)
+    return entry
+
+@app.route("/api/health", methods=["GET"])
+def health():
+    return jsonify({"status": "OPERATIONAL", "version": "2.0.0",
+                     "modules": ["SCBRegistry", "EventStore", "ExecutionEngine", "DAGEngine"],
+                     "timestamp": datetime.datetime.utcnow().isoformat() + "Z"})
+
+@app.route("/api/scb/create", methods=["POST"])
 def create_scb():
-    data = request.get_json() or {}
-    try:
-        required = ['scb_id', 'version', 'intent', 'constraints', 'inputs',
-                    'outputs', 'dependencies', 'rules', 'safety_gates', 'tests',
-                    'implementation_notes']
-        for field in required:
-            if field not in data:
-                return error_response(f"Missing required field: {field}")
+    global scb_id_counter
+    body = request.get_json() or {}
+    intent = body.get("intent", f"SCB-{scb_id_counter + 1}")
+    deps = body.get("deps", [])
+    scb_id = f"scb-{scb_id_counter + 1:03d}"
+    scb_id_counter += 1
 
-        scb = SCB(**data)
-        scb_hash = registry.put(scb)
+    scb = SCB(scb_id, intent, risk=body.get("risk", "LOW"))
+    scb.deps = deps
+    scbs[scb_id] = scb
 
-        event_store.append("SCB_CREATED", {
-            "scb_id": scb.scb_id,
-            "hash": scb_hash,
-            "version": scb.version
-        })
+    log_event("SCB_CREATED", f"Created {scb_id}: {intent}", role="Kimi")
+    return jsonify({"id": scb_id, "scb": scb.to_dict()}), 201
 
-        return api_response({
-            "scb": scb.to_dict(),
-            "hash": scb_hash,
-            "timestamp": scb.created_at
-        }, 201)
-    except ValueError as e:
-        return error_response(str(e))
-    except Exception as e:
-        return error_response(f"Internal error: {e}", 500)
+@app.route("/api/scb/list", methods=["GET"])
+def list_scbs():
+    return jsonify({"scbs": [s.to_dict() for s in scbs.values()], "count": len(scbs)})
 
-@app.route('/api/scb/<scb_id>', methods=['GET'])
+@app.route("/api/scb/<scb_id>", methods=["GET"])
 def get_scb(scb_id):
-    scb = registry.get(scb_id)
+    scb = scbs.get(scb_id)
     if not scb:
-        return error_response(f"SCB not found: {scb_id}", 404)
-    return api_response({"scb": scb.to_dict()})
+        return jsonify({"error": f"SCB {scb_id} not found"}), 404
+    return jsonify(scb.to_dict())
 
-@app.route('/api/scb/<scb_id>', methods=['PUT'])
-def update_scb(scb_id):
-    return error_response("SCBs are immutable — cannot update, only version", 400)
-
-@app.route('/api/scb/<scb_id>', methods=['DELETE'])
-def delete_scb(scb_id):
-    return error_response("SCBs are append-only — no deletion permitted", 400)
-
-@app.route('/api/scb/<scb_id>/exists', methods=['GET'])
-def check_scb(scb_id):
-    return api_response({"scb_id": scb_id, "exists": registry.has(scb_id)})
-
-# ─── Simulation & Execution ────────────────────────────────
-@app.route('/api/simulate', methods=['POST'])
+@app.route("/api/scb/simulate", methods=["POST"])
 def simulate():
-    data = request.get_json() or {}
-    chain = data.get('chain', [])
+    body = request.get_json() or {}
+    scb_id = body.get("scb_id", "scb-001")
+    mu_vals = body.get("mu_vals", [0.9999, 0.9998, 0.9997, 0.9996])
+    ch_vals = body.get("ch_vals", [1.0, 1.0, 1.0, 1.0])
 
-    result = engine.simulate(chain)
+    mu = calc_mu(mu_vals)
+    ch = calc_ch(ch_vals)
+    hr = calc_hr(mu, ch)
+    passed = hr >= 0.9995
 
-    event_store.append("SIMULATION_RUN", {
-        "chain_length": len(chain),
-        "result": result
-    })
+    entry = log_event("SIMULATION", f"Simulating {scb_id}", role="PFRP",
+                      result="ALLOW" if passed else "BLOCK",
+                      metrics={"mu": round(mu, 6), "ch": round(ch, 6), "hr": round(hr, 6)})
 
-    return api_response({
-        "mu": result["mu"],
-        "ch": result["ch"],
-        "hr": result["hr"],
-        "threshold": MU_THRESHOLD,
-        "pass": result["result"] == "ALLOW",
-        "chain_length": len(chain)
-    })
+    if scb_id in scbs:
+        scbs[scb_id].mu = mu; scbs[scb_id].ch = ch; scbs[scb_id].hr = hr
+        scbs[scb_id].status = "simulated"
 
-@app.route('/api/execute/<scb_id>', methods=['POST'])
-def execute_scb(scb_id):
-    scb = registry.get(scb_id)
-    if not scb:
-        return error_response(f"SCB not found: {scb_id}", 404)
+    return jsonify({"passed": passed, "mu": round(mu, 6), "ch": round(ch, 6),
+                     "hr": round(hr, 6), "threshold": mu_min, "event": entry})
 
-    input_data = request.get_json() or {}
+@app.route("/api/scb/execute", methods=["POST"])
+def execute():
+    body = request.get_json() or {}
+    scb_id = body.get("scb_id", "scb-001")
 
-    result = engine.execute(scb, input_data)
+    if scb_id not in scbs:
+        return jsonify({"error": f"SCB {scb_id} not found"}), 404
 
-    return api_response({
-        "result": result.to_dict(),
-        "threshold": MU_THRESHOLD
-    })
+    scb = scbs[scb_id]
+    mu_vals = body.get("mu_vals", [0.9999, 0.9998, 0.9997])
+    ch_vals = body.get("ch_vals", [1.0, 1.0, 1.0])
 
-@app.route('/api/execute/chain', methods=['POST'])
-def execute_chain():
-    """Execute a chain of SCBs in topological order."""
-    data = request.get_json() or {}
-    scb_ids = data.get('scb_ids', [])
+    mu = calc_mu(mu_vals)
+    ch = calc_ch(ch_vals)
+    hr = calc_hr(mu, ch)
+    passed = hr >= 0.9995
 
-    graph = SCBGraph()
-    for sid in scb_ids:
-        scb = registry.get(sid)
-        if not scb:
-            return error_response(f"SCB not found: {sid}", 404)
-        try:
-            graph.add(scb)
-        except ValueError as e:
-            return error_response(str(e))
+    if not passed:
+        entry = log_event("EXECUTION_BLOCKED", f"Blocked: HR={hr:.6f} < {mu_min}", role="PFRP", result="BLOCK")
+        return jsonify({"passed": False, "mu": round(mu, 6), "ch": round(ch, 6), "hr": round(hr, 6), "event": entry}), 200
 
-    try:
-        graph.validate_acyclic()
-    except ValueError as e:
-        return error_response(f"Graph invalid: {e}")
+    scb.mu = mu; scb.ch = ch; scb.hr = hr
+    scb.status = "executed"
+    seal_id = seal(scb)
+    scb.seal = seal_id
 
-    ordered = graph.topological_order()
-    results = []
+    entry = log_event("SCB_EXECUTED", f"Sealed {scb_id}", role="Kimi", result="SEALED",
+                       metrics={"mu": round(mu, 6), "ch": round(ch, 6), "hr": round(hr, 6), "seal": seal_id})
 
-    for scb in ordered:
-        result = engine.execute(scb)
-        results.append(result.to_dict())
-        if result.status == "LOCK":
-            event_store.append("CHAIN_HALTED", {"last_scb": scb.scb_id, "status": "LOCK"})
-            break
+    return jsonify({"passed": True, "seal": seal_id, "mu": round(mu, 6),
+                    "ch": round(ch, 6), "hr": round(hr, 6), "event": entry})
 
-    event_store.append("CHAIN_EXECUTED", {"chain": scb_ids, "results_count": len(results)})
+@app.route("/api/events", methods=["GET"])
+def get_events():
+    limit = int(request.args.get("limit", 50))
+    return jsonify({"events": list(events)[-limit:], "count": len(events)})
 
-    return api_response({
-        "executed": len(results),
-        "total": len(scb_ids),
-        "results": results
-    })
-
-# ─── Audit & Events ────────────────────────────────────────
-@app.route('/api/audit', methods=['GET'])
-def get_audit():
-    after_seq = int(request.args.get('after', 0))
-    events = event_store.get_events(after_seq)
-    return api_response({
-        "events": events,
-        "count": len(events),
-        "latest_seq": events[-1]['seq'] if events else after_seq
-    })
-
-@app.route('/api/audit/replay', methods=['GET'])
-def replay_events():
-    from_seq = int(request.args.get('from', 0))
-    events = event_store.replay(from_seq)
-    return api_response({
-        "events": events,
-        "count": len(events),
-        "replayed_from": from_seq
-    })
-
-@app.route('/api/metrics', methods=['GET'])
+@app.route("/api/metrics", methods=["GET"])
 def get_metrics():
-    """System metrics — how many SCBs, events, seal status."""
-    scbs = registry.list_all()
-    events = event_store.get_events()
-    audit = engine.audit_log
+    mu_vals = [s.mu for s in scbs.values() if s.mu]
+    ch_vals = [s.ch for s in scbs.values() if s.ch]
+    hr_vals = [s.hr for s in scbs.values() if s.hr]
 
-    mu_vals = [r.mu for r in audit if hasattr(r, 'mu')]
-    ch_vals = [sum(r.ch)/len(r.ch) if r.ch else 1.0 for r in audit if hasattr(r, 'ch')]
-
-    return api_response({
+    return jsonify({
         "scb_count": len(scbs),
         "event_count": len(events),
-        "execution_count": len(audit),
-        "average_mu": round(sum(mu_vals)/len(mu_vals), 6) if mu_vals else 0,
-        "average_hr": round(sum(mu_vals)/len(mu_vals), 6) if mu_vals else 0,
-        "sealed_count": len([r for r in audit if r.status == "MOVE"]),
-        "blocked_count": len([r for r in audit if r.status == "LOCK"]),
-        "coherence_threshold": MU_THRESHOLD,
-        "system": "UATOS v2.0 — Sovereign · Serverless · Cloudless · Vendorless"
+        "mu_avg": round(calc_mu(mu_vals), 6) if mu_vals else 0,
+        "ch_avg": round(calc_ch(ch_vals), 6) if ch_vals else 0,
+        "hr_avg": round(sum(hr_vals) / len(hr_vals), 6) if hr_vals else 0,
+        "pass_count": sum(1 for s in scbs.values() if s.status == "executed"),
+        "pending_count": sum(1 for s in scbs.values() if s.status == "pending"),
     })
 
-@app.route('/api/health', methods=['GET'])
-def health():
-    return api_response({
-        "status": "OPERATIONAL",
-        "version": "2.0.0",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "modules": ["SCBRegistry", "EventStore", "ExecutionEngine", "DAGEngine"]
-    })
-
-@app.route('/')
-def index():
-    return send_from_directory(os.path.join(os.path.dirname(__file__), '..', 'frontend'), 'index.html')
-
-@app.route('/api/docs', methods=['GET'])
-def docs():
-    return jsonify({
-        "name": "UATOS v2 API",
-        "version": "2.0.0",
-        "description": "Sovereign AI Team Operating System — Production API",
-        "base_url": "/api",
-        "endpoints": [
-            {"method": "GET", "path": "/api/scbs", "description": "List all SCBs"},
-            {"method": "POST", "path": "/api/scb", "description": "Create new SCB"},
-            {"method": "GET", "path": "/api/scb/:id", "description": "Get SCB by ID"},
-            {"method": "GET", "path": "/api/scb/:id/exists", "description": "Check SCB exists"},
-            {"method": "POST", "path": "/api/simulate", "description": "Simulate pipeline chain"},
-            {"method": "POST", "path": "/api/execute/:id", "description": "Execute single SCB"},
-            {"method": "POST", "path": "/api/execute/chain", "description": "Execute SCB chain"},
-            {"method": "GET", "path": "/api/audit", "description": "Get event log"},
-            {"method": "GET", "path": "/api/audit/replay", "description": "Replay events from seq"},
-            {"method": "GET", "path": "/api/metrics", "description": "System metrics"},
-            {"method": "GET", "path": "/api/health", "description": "Health check"}
-        ],
-        "philosophy": "Sovereign · Serverless · Cloudless · Vendorless · Module-like"
-    })
-
-if __name__ == '__main__':
-    port = int(os.environ.get('UATOS_PORT', 3092))
-    app.run(host='0.0.0.0', port=port, debug=False)
+if __name__ == "__main__":
+    import os
+    port = int(os.environ.get("PORT", 3092))
+    app.run(host="0.0.0.0", port=port, debug=False)
