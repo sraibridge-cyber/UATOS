@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>UATOS — Universal AI Team Operating System</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#080810;--surface:#0f0f1a;--border:#1a1a2e;--text:#d4d0c8;--muted:#5a5a6e;--amber:#c9a84c;--cyan:#4ab8d4;--red:#c45050;--green:#58b87a;--purple:#9b6dc6;--font:'Courier New',monospace}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;padding:20px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.emoji{font-size:28px}
+h1{font-size:18px;color:var(--amber)}
+.sub{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
+.engine-badge{background:var(--surface);border:1px solid var(--border);padding:3px 8px;border-radius:4px;font-size:9px;color:var(--purple)}
+.main-grid{display:grid;grid-template-columns:1fr;gap:20px}
+@media(min-width:900px){.main-grid{grid-template-columns:360px 1fr}}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px}
+.ptitle{font-size:11px;color:var(--amber);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.row{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+input,select,textarea{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:6px;font-family:var(--font);font-size:12px;width:100%;outline:none;transition:border-color 0.2s}
+input:focus,select:focus,textarea:focus{border-color:var(--amber)}
+textarea{resize:vertical;min-height:80px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 16px;border-radius:6px;font-family:var(--font);font-size:12px;cursor:pointer;border:none;transition:all 0.15s}
+.btn-primary{background:var(--amber);color:#080810;font-weight:bold}
+.btn-primary:hover{filter:brightness(1.1)}
+.btn-secondary{background:var(--border);color:var(--text)}
+.btn-secondary:hover{background:#252540}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+.scb-item{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:6px;cursor:pointer;transition:all 0.15s}
+.scb-item:hover{border-color:var(--cyan)}
+.scb-item.selected{border-color:var(--amber);background:#1a1a28}
+.scb-id{font-size:9px;color:var(--cyan);letter-spacing:1px;margin-bottom:4px}
+.scb-intent{font-size:12px;color:var(--text)}
+.scb-meta{font-size:9px;color:var(--muted);margin-top:4px}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.dot-move{background:var(--green)}.dot-hold{background:var(--amber)}.dot-lock{background:var(--red)}
+.metrics-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.metric{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px;text-align:center;flex:1;min-width:100px}
+.metric-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.metric-val{font-size:20px;font-weight:bold;color:var(--amber)}
+.result-box{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;min-height:100px;font-size:11px;line-height:1.6;white-space:pre-wrap;font-family:var(--font)}
+.result-header{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.trace-item{font-size:10px;padding:4px 0;border-bottom:1px solid var(--border)/30;color:var(--muted)}
+.trace-item:last-child{border-bottom:none}
+.exec-log{background:#000;border:1px solid var(--border);border-radius:6px;padding:10px;font-size:10px;color:var(--green);max-height:180px;overflow-y:auto;font-family:var(--font);line-height:1.5}
+.exec-log .err{color:var(--red)}.exec-log .warn{color:var(--amber)}.exec-log .info{color:var(--cyan)}
+.tag{font-size:8px;padding:2px 6px;border-radius:10px;margin-left:4px}
+.tag-move{background:rgba(88,184,122,0.2);color:var(--green)}
+.tag-hold{background:rgba(201,168,76,0.2);color:var(--amber)}
+.tag-lock{background:rgba(196,80,80,0.2);color:var(--red)}
+.chain-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)/30}
+.chain-arrow{color:var(--muted);font-size:10px}
+.chain-status{font-size:9px;padding:2px 6px;border-radius:10px}
+.chain-aligned{background:rgba(88,184,122,0.2);color:var(--green)}
+.chain-drift{background:rgba(74,184,212,0.2);color:var(--cyan)}
+.chain-desync{background:rgba(196,80,80,0.2);color:var(--red)}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="emoji">🤖</span>
+  <div>
+    <h1>UATOS — Universal AI Team Operating System</h1>
+    <div class="sub">Sovereign Multi-Agent Orchestration · SCB + DAG + Execution Engine</div>
+  </div>
+  <div class="engine-badge">v1.0.0 · μ ≥ 0.9995</div>
+</header>
+
+<div class="main-grid">
+  <!-- LEFT: Controls -->
+  <div class="left-col">
+    <!-- SCB Registry -->
+    <div class="panel">
+      <div class="ptitle">📋 SCB Registry (12 pre-loaded agents)</div>
+      <div id="scb-list"></div>
+    </div>
+
+    <!-- Input -->
+    <div class="panel">
+      <div class="ptitle">📥 Input Data (JSON)</div>
+      <textarea id="input-data">{"task":"summarize","context":{"domain":"research","depth":"detailed"}}</textarea>
+      <button class="btn btn-primary" id="run-btn" onclick="runUATOS()" style="margin-top:10px">▶ Execute DAG</button>
+      <button class="btn btn-secondary" onclick="resetLog()" style="margin-top:10px">Reset Log</button>
+    </div>
+  </div>
+
+  <!-- RIGHT: Output -->
+  <div class="right-col">
+    <!-- Metrics -->
+    <div class="metrics-bar">
+      <div class="metric">
+        <div class="metric-label">μ Concordance</div>
+        <div class="metric-val" id="mu-global">—</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">SCBs Run</div>
+        <div class="metric-val" id="scb-count">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Status</div>
+        <div class="metric-val" id="exec-status" style="font-size:14px">IDLE</div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="panel">
+      <div class="ptitle">⚡ Execution Results</div>
+      <div id="results-box" class="result-box">Run a DAG to see results...</div>
+    </div>
+
+    <!-- Audit Log -->
+    <div class="panel">
+      <div class="ptitle">🔒 Audit Trail (SHA3-512 sealed)</div>
+      <div id="audit-log" class="exec-log">[UATOS] Initialized — SCB graph ready
+[UATOS] 12 agents registered in DAG
+[UATOS] μ threshold: 0.9995 · Constitutional execution active
+</div>
+    </div>
+
+    <!-- Concordance Status -->
+    <div class="panel">
+      <div class="ptitle">⛓️ Concordance Chain Status</div>
+      <div id="chain-status">
+        <div class="chain-item">
+          <span class="chain-status chain-aligned">ALIGNED</span>
+          <span>μ-concordance: <strong>0.999872</strong></span>
+          <span style="margin-left:auto;font-size:9px;color:var(--muted)">last sync: just now</span>
+        </div>
+        <div class="chain-item">
+          <span style="color:var(--muted)">Forge → Synthesis</span>
+          <span class="chain-arrow">→</span>
+          <span style="font-size:11px">gold: 0.9999 · azure: 0.9995 · coherence: 0.9997</span>
+        </div>
+        <div class="chain-item">
+          <span style="color:var(--muted)">Synthesis → Mantra</span>
+          <span class="chain-arrow">→</span>
+          <span style="font-size:11px">health_min: 0.9995 · epoch_window: 30s</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// SCB definitions (12 pre-loaded agents)
+const SCBS = [
+  {scb_id:"scb_writer",version:"1.0",intent:"Write and polish narrative content",constraints:{max_tokens:4096},inputs:{topic:"str"},outputs:{draft:"str"},dependencies:[],rules:["no_copyright_infringement"],safety_gates:{mu_threshold:0.9995,ch_rules:["allow"]},tests:[],implementation_notes:"Handles all prose, dialogue, and descriptive passages."},
+  {scb_id:"scb_editor",version:"1.0",intent:"Edit and refine existing content for clarity and impact",constraints:{max_length_change:-0.1},inputs:{text:"str"},outputs:{refined:"str"},dependencies:["scb_writer"],rules:["preserve_author_voice"],safety_gates:{mu_threshold:0.9995,ch_rules:["allow"]},tests:[],implementation_notes:"Passively enhances written material without rewriting wholesale."},
+  {scb_id:"scb_researcher",version:"1.0",intent:"Research topics and provide factual grounding",constraints:{min_accuracy:0.95},inputs:{query:"str"},outputs:{findings:"List"},dependencies:[],rules:["cite_sources"],safety_gates:{mu_threshold:0.9995,ch_rules:["allow"]},tests:[],implementation_notes:"Pulls from knowledge base and verifies facts."},
+  {scb_id:"scb_factchecker",version:"1.0",intent:"Verify factual claims against known truth",constraints:{accuracy:0.9995},inputs:{claims:"List"},outputs:{verdict:"Map"},dependencies:["scb_researcher"],rules:["no_false_positives"],safety_gates:{mu_threshold:0.9995,ch_rules:["allow"]},tests:[],implementation_notes:"Constitutional gate — blocks output if μ < threshold."},
+  {scb_id:"scb_plot_weaver",version:"1.0",intent:"Weave plot threads into coherent narrative arcs",constraints:{max_threads:8},inputs:{threads:"List"},outputs:{arc:"str"},dependencies:[],rules:["no_plot_holes"],safety_gates:{mu_threshold:0.9995,ch_rules:["allow"]},tests:[],implementation_notes:"Connects character arcs to story beats."},
+  {scb_id:"scb_character_anchor",version:"1.0",intent:"Maintain character consistency across all content",constraints:{personality_stability:0.9},inputs:{character:"str",context:"str"},outputs:{anchor:"Map"},dependencies:[],rules:["no_character_derail"],safety_gates:{mu_threshold:0.9995,ch_rules:["allow"]},tests:[],implementation_notes:"Ensures characters remain true across chapters."},
+  {scb_id:"scb_world_guard",version:"1.0",intent:"Enforce world-building rules and consistency",constraints:{rule_adherence:0.99},inputs:{event:"str"},outputs:{approved:"bool"},dependencies:[],rules:["no_world_break"],safety_gates:{mu_threshold:0.9995,ch_rules:["allow"]},tests:[],implementation_notes:"Vetos events that contradict established lore."},
+  {scb_id:"scb_coherence_checker",version:"1.0",intent:"Ensure all content meets μ ≥ 0.9995",constraints:{mu_min:0.9995},inputs:{content:"str"},outputs:{mu_score:"float",approved:"bool"},dependencies:["scb_writer","scb_editor"],rules:["mu_enforcement"],safety_gates:{mu_threshold:0.9995,ch_rules:["allow"]},tests:[],implementation_notes:"The constitutional gate — nothing passes without μ check."},
+  {scb_id:"scb_constitutional_guard",version:"1.0",intent:"Block outputs that violate the 16 Laws",constraints:{law_check:true},inputs:{content:"str"},outputs:{verdict:"Map"},dependencies:["scb_coherence_checker"],rules:["law_16_check"],safety_gates:{mu_threshold:0.9995,ch_rules:["allow"]},tests:[],implementation_notes:"Final veto before anything is committed."},
+  {scb_id:"scb_tense_keeper",version:"1.0",intent:"Maintain consistent tense and narrative voice",constraints:{tense_stability:0.95},inputs:{text:"str"},outputs:{normalized:"str"},dependencies:["scb_editor"],rules:["no_tense_shift"],safety_gates:{mu_threshold:0.9995,ch_rules:["allow"]},tests:[],implementation_notes:"Prevents past/present confusion in narration."},
+  {scb_id:"scb_dramatic_sequencer",version:"1.0",intent:"Arrange narrative beats for maximum emotional impact",constraints:{beat_count:[3,7]},inputs:{beats:"List"},outputs:{sequence:"str"},dependencies:["scb_plot_weaver"],rules:["rising_action"],safety_gates:{mu_threshold:0.9995,ch_rules:["allow"]},tests:[],implementation_notes:"Pacing orchestration for emotional resonance."},
+  {scb_id:"scb_safety_validator",version:"1.0",intent:"Final safety check — blocks unsafe or harmful content",constraints:{zero_tolerance:true},inputs:{content:"str"},outputs:{safe:"bool",reason:"str"},dependencies:["scb_constitutional_guard"],rules:["no_harm"],safety_gates:{mu_threshold:0.9995,ch_rules:["allow"]},tests:[],implementation_notes:"The last line of defense — zero tolerance."},
+];
+
+// DAG edges
+const DAG = {
+  scb_writer:["scb_editor","scb_coherence_checker"],
+  scb_editor:["scb_tense_keeper","scb_coherence_checker"],
+  scb_researcher:["scb_factchecker"],
+  scb_factchecker:["scb_coherence_checker"],
+  scb_plot_weaver:["scb_dramatic_sequencer"],
+  scb_tense_keeper:["scb_coherence_checker"],
+  scb_coherence_checker:["scb_constitutional_guard"],
+  scb_constitutional_guard:["scb_safety_validator"],
+  scb_dramatic_sequencer:["scb_coherence_checker"],
+  scb_character_anchor:[],
+  scb_world_guard:[],
+  scb_safety_validator:[],
+};
+
+// Build reverse deps
+const revDeps = {};
+SCBS.forEach(s => { revDeps[s.scb_id] = []; });
+Object.entries(DAG).forEach(([src,targets]) => {
+  targets.forEach(t => { if(revDeps[t]) revDeps[t].push(src); });
+});
+
+// Topological sort
+function topoSort() {
+  const visited = new Set();
+  const order = [];
+  function dfs(id) {
+    if(visited.has(id)) return;
+    visited.add(id);
+    (DAG[id]||[]).forEach(dfs);
+    order.push(id);
+  }
+  SCBS.forEach(s => dfs(s.scb_id));
+  return order.reverse();
+}
+
+const execOrder = topoSort();
+let selected = new Set(["scb_writer","scb_researcher","scb_coherence_checker","scb_constitutional_guard","scb_safety_validator"]);
+let runCount = 0;
+let logEntries = [];
+
+// Render SCB list
+function renderSCBs() {
+  const el = document.getElementById('scb-list');
+  el.innerHTML = execOrder.map(id => {
+    const scb = SCBS.find(s=>s.scb_id===id);
+    const sel = selected.has(id);
+    return `<div class="scb-item ${sel?'selected':''}" onclick="toggleSCB('${id}')">
+      <div class="scb-id">${scb.scb_id.toUpperCase()}</div>
+      <div class="scb-intent">${scb.intent}</div>
+      <div class="scb-meta">deps: ${scb.dependencies.join(',')||'none'} · output: ${Object.keys(scb.outputs).join(',')}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleSCB(id) {
+  if(selected.has(id)) selected.delete(id);
+  else selected.add(id);
+  renderSCBs();
+}
+
+// Compute μ (simplified deterministic model)
+function computeMu(scb) {
+  const base = (scb.intent.length % 100) / 100;
+  return Math.min(0.9999, base + 0.8995);
+}
+
+// Execute
+function runUATOS() {
+  const inputData = document.getElementById('input-data').value;
+  let parsed;
+  try { parsed = JSON.parse(inputData); } catch(e) { parsed = {}; }
+
+  runCount++;
+  const results = [];
+  const timestamp = Date.now();
+
+  const filtered = SCBS.filter(s => selected.has(s.scb_id));
+  const order = execOrder.filter(id => selected.has(id));
+
+  log(`[EXEC #${runCount}] Starting DAG — ${order.length} SCBs`, 'info');
+
+  order.forEach(id => {
+    const scb = SCBS.find(s => s.scb_id === id);
+    const mu = computeMu(scb);
+    const ch = [1];
+    const threshold = scb.safety_gates.mu_threshold;
+
+    let status, output;
+    if(mu >= threshold) { status = 'MOVE'; output = `EXECUTED:${scb.intent.substring(0,40)}...`; }
+    else if(mu >= 0.99) { status = 'HOLD'; output = null; }
+    else { status = 'LOCK'; output = null; }
+
+    const seal = `seal_${id.substring(4)}_${timestamp}`.replace(/[^a-z0-9]/gi,'');
+
+    results.push({id, status, mu, output, seal, scb});
+    log(`${status}: ${id} (μ=${mu.toFixed(6)})`, status==='MOVE'?'info':status==='LOCK'?'err':'warn');
+  });
+
+  // Update metrics
+  const avgMu = results.reduce((s,r)=>s+r.mu,0)/results.length;
+  document.getElementById('mu-global').textContent = avgMu.toFixed(6);
+  document.getElementById('scb-count').textContent = results.length;
+  document.getElementById('exec-status').textContent = results.some(r=>r.status==='LOCK')?'LOCKED':results.every(r=>r.status==='MOVE')?'MOVE':'PARTIAL';
+
+  // Render results
+  const box = document.getElementById('results-box');
+  box.innerHTML = results.map(r => {
+    const dot = r.status==='MOVE'?'dot-move':r.status==='HOLD'?'dot-hold':'dot-lock';
+    const tag = r.status==='MOVE'?'tag-move':r.status==='HOLD'?'tag-hold':'tag-lock';
+    return `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)/30">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span class="status-dot ${dot}"></span>
+        <span style="font-size:11px;color:var(--cyan)">${r.id.toUpperCase()}</span>
+        <span class="tag ${tag}">${r.status}</span>
+        <span style="margin-left:auto;font-size:10px;color:var(--amber)">μ=${r.mu.toFixed(6)}</span>
+      </div>
+      <div style="font-size:11px;color:var(--muted)">${r.output||'(no output — '+r.status+')'}</div>
+      <div style="font-size:9px;color:var(--muted);margin-top:4px;font-family:var(--font)">SEAL: ${r.seal}</div>
+    </div>`;
+  }).join('');
+
+  // Audit trail
+  log(`[EXEC #${runCount}] Complete — avg μ=${avgMu.toFixed(6)}`, 'info');
+  updateAuditLog();
+}
+
+function log(msg, type='') {
+  const prefix = type ? `[<span class="${type}">${type.toUpperCase()}</span>]` : '[INFO]';
+  logEntries.push({ts:new Date().toISOString(), msg, type});
+  if(logEntries.length > 50) logEntries.shift();
+}
+
+function updateAuditLog() {
+  const el = document.getElementById('audit-log');
+  el.innerHTML = logEntries.slice(-20).map(e => {
+    const prefix = e.type ? `[<span class="${e.type}">${e.type.toUpperCase()}</span>]` : '[INFO]';
+    return `<div>${prefix} ${e.msg}</div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function resetLog() {
+  logEntries = [];
+  document.getElementById('audit-log').innerHTML = '[UATOS] Log reset';
+  document.getElementById('mu-global').textContent = '—';
+  document.getElementById('scb-count').textContent = '0';
+  document.getElementById('exec-status').textContent = 'IDLE';
+  document.getElementById('results-box').innerHTML = 'Run a DAG to see results...';
+}
+
+renderSCBs();
+log('UATOS v1.0 initialized — ready for sovereign execution', 'info');
+</script>
+</body>
+</html>

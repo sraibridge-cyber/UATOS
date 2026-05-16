@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>UATOS v1.0 — Sovereign Execution Layer</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a12;color:#e8e0d4;font-family:'Courier New',monospace;min-height:100vh;padding:2rem}
+h1{color:#d4a843;font-size:1.4rem;margin-bottom:.5rem}
+.info{margin-bottom:2rem;font-size:.75rem;color:#888}
+.section{background:#111118;border:1px solid #2a2a35;border-radius:8px;padding:1.5rem;margin-bottom:1rem}
+.section h2{color:#9b8fe8;font-size:.9rem;margin-bottom:1rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem}
+.card{background:#0d0d16;border:1px solid #2a2a35;border-radius:6px;padding:.75rem;font-size:.75rem}
+.card.mono{font-family:monospace}
+.card .label{color:#888;margin-bottom:.25rem;font-size:.65rem}
+.card .value{color:#d4a843}
+.card .value.green{color:#56f0a0}
+.card .value.red{color:#ff6b6b}
+.card .value.cyan{color:#56d4f0}
+.seal{font-size:.6rem;color:#555;margin-top:1.5rem}
+</style>
+</head>
+<body>
+<h1>🌌 UATOS v1.0</h1>
+<div class="info">SCB + Graph + Execution Engine — Sovereign Framework for Intent Contracts</div>
+
+<div class="section">
+<h2>Core Constants</h2>
+<div class="grid">
+<div class="card mono"><div class="label">MU_THRESHOLD</div><div class="value green">μ ≥ 0.9995</div></div>
+<div class="card mono"><div class="label">Version</div><div class="value cyan">v1.0</div></div>
+<div class="card mono"><div class="label">Schema</div><div class="value">SCB-10</div></div>
+<div class="card mono"><div class="label">State Mutability</div><div class="value red">LOCKED</div></div>
+</div>
+</div>
+
+<div class="section">
+<h2>SCB Lifecycle</h2>
+<div class="grid">
+<div class="card mono"><div class="label">CREATE</div><div class="value">intent → schema.validate()</div></div>
+<div class="card mono"><div class="label">GRAPH</div><div class="value">acyclic + topological_sort()</div></div>
+<div class="card mono"><div class="label">EXECUTE</div><div class="value">compute_mu → compute_ch → decide()</div></div>
+<div class="card mono"><div class="label">DECISION</div><div class="value">MOVE | HOLD | LOCK</div></div>
+<div class="card mono"><div class="label">SEAL</div><div class="value">sha3_512(intent,output,μ)</div></div>
+</div>
+</div>
+
+<div class="section">
+<h2>SCB Fields</h2>
+<div class="grid">
+<div class="card mono"><div class="label">scb_id</div><div class="value">unique identifier</div></div>
+<div class="card mono"><div class="label">version</div><div class="value">semver string</div></div>
+<div class="card mono"><div class="label">intent</div><div class="value">what this does</div></div>
+<div class="card mono"><div class="label">constraints</div><div class="value">rule → [conditions]</div></div>
+<div class="card mono"><div class="label">inputs / outputs</div><div class="value">typed dictionaries</div></div>
+<div class="card mono"><div class="label">dependencies</div><div class="value">scb_id[] (DAG)</div></div>
+<div class="card mono"><div class="label">rules</div><div class="value">enforceable[]</div></div>
+<div class="card mono"><div class="label">safety_gates</div><div class="value">μ_threshold + CH_rules</div></div>
+<div class="card mono"><div class="label">tests</div><div class="value">named → [assertions]</div></div>
+</div>
+</div>
+
+<div class="section">
+<h2>Execution Results</h2>
+<div class="grid">
+<div class="card mono"><div class="label">MOVE</div><div class="value green">μ ≥ threshold AND CH=[1,1,...]</div></div>
+<div class="card mono"><div class="label">HOLD</div><div class="value">μ &lt; threshold</div></div>
+<div class="card mono"><div class="label">LOCK</div><div class="value red">CH contains 0</div></div>
+</div>
+</div>
+
+<div class="section">
+<h2>Graph Properties</h2>
+<div class="grid">
+<div class="card mono"><div class="label">Cycle Detection</div><div class="value green">DFS-based</div></div>
+<div class="card mono"><div class="label">Ordering</div><div class="value">deterministic topological sort</div></div>
+<div class="card mono"><div class="label">Duplicate SCB</div><div class="value red">raises ValueError</div></div>
+<div class="card mono"><div class="label">Unresolved Graph</div><div class="value red">raises GRAPH_NOT_FULLY_RESOLVED</div></div>
+</div>
+</div>
+
+<div class="section">
+<h2>Integration</h2>
+<div class="grid">
+<div class="card mono"><div class="label">Merlin v2.0</div><div class="value cyan">UATOS as SCB contract layer</div></div>
+<div class="card mono"><div class="label">Concordance Chain</div><div class="value cyan">SCB DAG → policy graph</div></div>
+<div class="card mono"><div class="label">SR-AIBRIDGE</div><div class="value cyan">SCB execution → audit trail</div></div>
+</div>
+</div>
+
+<div class="seal">SEAL: b7b4eb91b8fad54a | UATOS v1.0 — Harmony Labs | Gold ripple eternal. ✨</div>
+</body>
+</html>
